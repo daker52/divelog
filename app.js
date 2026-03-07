@@ -2217,64 +2217,52 @@ function bindProfileEvents() {
     reader.readAsDataURL(file);
   });
 
-  dom.profileForm.addEventListener("submit", (event) => {
+  dom.profileForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!dom.profileForm.reportValidity()) {
-      return;
-    }
+    if (!dom.profileForm.reportValidity()) return;
+
+    const saveBtn = dom.profileForm.querySelector('[type="submit"]');
+    if (saveBtn) saveBtn.disabled = true;
 
     const file = dom.profileAvatarFile.files[0];
+    const buildProfileBody = (avatarUrl) => ({
+      username: dom.profileName.value.trim(),
+      certification: dom.profileCertification.value.trim(),
+      home_location: dom.profileHomeLocation.value.trim(),
+      bio: dom.profileBio.value.trim(),
+      ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}),
+    });
+
+    const applyProfile = (avatarUrl) => {
+      appState.profile = {
+        ...appState.profile,
+        name: dom.profileName.value.trim(),
+        email: dom.profileEmail.value.trim(),
+        certification: dom.profileCertification.value.trim(),
+        homeLocation: dom.profileHomeLocation.value.trim(),
+        bio: dom.profileBio.value.trim(),
+        ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+      };
+      persistProfile();
+      renderTopProfile();
+      closeProfileModal();
+    };
+
     if (file) {
       const reader = new FileReader();
-      reader.onload = async (event) => {
-        appState.profile = {
-          ...appState.profile,
-          name: dom.profileName.value.trim(),
-          email: dom.profileEmail.value.trim(),
-          certification: dom.profileCertification.value.trim(),
-          homeLocation: dom.profileHomeLocation.value.trim(),
-          bio: dom.profileBio.value.trim(),
-          avatarUrl: event.target.result,
-        };
-        persistProfile();
-        renderTopProfile();
-        closeProfileModal();
-        // Sync to API
-        try {
-          await apiFetch("/auth/profile", { method: "PUT", body: {
-            username: appState.profile.name,
-            certification: appState.profile.certification,
-            home_location: appState.profile.homeLocation,
-            bio: appState.profile.bio,
-            avatar_url: appState.profile.avatarUrl,
-          }});
-        } catch {}
+      reader.onload = async (e) => {
+        const avatarUrl = e.target.result;
+        applyProfile(avatarUrl);
+        try { await apiFetch("/auth/profile", { method: "PUT", body: buildProfileBody(avatarUrl) }); } catch {}
+        if (saveBtn) saveBtn.disabled = false;
       };
       reader.readAsDataURL(file);
       return;
     }
 
-    appState.profile = {
-      ...appState.profile,
-      name: dom.profileName.value.trim(),
-      email: dom.profileEmail.value.trim(),
-      certification: dom.profileCertification.value.trim(),
-      homeLocation: dom.profileHomeLocation.value.trim(),
-      bio: dom.profileBio.value.trim(),
-    };
-
-    persistProfile();
-    renderTopProfile();
-    closeProfileModal();
-    // Sync to API (no avatar change)
-    try {
-      apiFetch("/auth/profile", { method: "PUT", body: {
-        username: appState.profile.name,
-        certification: appState.profile.certification,
-        home_location: appState.profile.homeLocation,
-        bio: appState.profile.bio,
-      }});
-    } catch {}
+    applyProfile();
+    try { await apiFetch("/auth/profile", { method: "PUT", body: buildProfileBody() }); } catch {}
+    if (saveBtn) saveBtn.disabled = false;
   });
 }
 
