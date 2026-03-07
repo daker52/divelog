@@ -1,0 +1,26 @@
+{
+  "name": "YourDiveLog",
+  "short_name": "DiveLog",
+  "description": "Osobní potápěčský deník – logujte každý ponor.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a3f66",
+  "theme_color": "#0a3f66",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "lifestyle"],
+  "lang": "cs"
+}

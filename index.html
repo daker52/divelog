@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YourDiveLog</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0a3f66" />
+    <link rel="apple-touch-icon" href="assets/logo.png" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="screen" class="screen phase-loading" aria-label="YourDiveLog aplikace">
+      <div class="caustics"></div>
+      <div class="ocean-bubbles" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <section class="view loading-view" aria-label="Loading view">
+        <div class="loading-content">
+          <img class="loading-logo" src="assets/logo.png" alt="YourDiveLog" />
+          <div class="spinner" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="view auth-view" aria-label="Auth view">
+        <div class="auth-card">
+          <h1 class="auth-title">YourDiveLog</h1>
+          <p class="auth-subtitle">Vyber, jak chceš pokračovat</p>
+          <div class="auth-actions">
+            <button class="auth-btn primary" data-enter-app>Register</button>
+            <button class="auth-btn secondary" data-enter-app>Login</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view app-view" aria-label="Diving Logbook view">
+        <div class="dashboard">
+          <header class="topbar">
+            <div class="brand-wrap">
+              <img class="brand-logo" src="assets/logo.png" alt="YourDiveLog" />
+              <nav class="nav">
+                <button class="nav-item active" type="button" data-tab="logs">My Logs</button>
+                <button class="nav-item" type="button" data-tab="statistics">Statistics</button>
+                <button class="nav-item" type="button" data-tab="map">Map</button>
+                <button class="nav-item" type="button" data-tab="equipment">Equipment</button>
+                <button class="nav-item" type="button" data-tab="community">Community</button>
+                <button class="nav-item" type="button" data-tab="forum">Forum</button>
+              </nav>
+            </div>
+            <div class="top-actions">
+              <button id="profileButton" class="avatar-btn" type="button" aria-label="Edit profile">
+                <img id="topAvatarImage" class="avatar" src="assets/logo.png" alt="Diver avatar" />
+              </button>
+              <button id="settingsButton" class="settings-btn" type="button" aria-label="Settings">⚙</button>
+              <button id="logoutButton" class="logout" type="button">Logout</button>
+            </div>
+          </header>
+
+          <div class="main-wrap">
+            <section class="tab-pane" data-tab-content="logs">
+              <div class="glass">
+              <aside class="sidebar">
+                <div class="field">
+                  <input id="searchInput" class="search" type="search" placeholder="Search" />
+                </div>
+
+                <h3 class="section-title">Location</h3>
+                <div class="field">
+                  <select id="locationFilter" class="select" aria-label="Location filter">
+                    <option value="all">All locations</option>
+                  </select>
+                </div>
+
+                <h3 class="section-title">Date Range</h3>
+                <div class="field date-row">
+                  <input id="startDate" class="date" type="date" aria-label="Start date" />
+                  <input id="endDate" class="date" type="date" aria-label="End date" />
+                </div>
+
+                <h3 class="section-title">Dive Type</h3>
+                <div class="checks">
+                  <label class="check"><input type="checkbox" data-type-filter="Recreational" checked /> Recreational</label>
+                  <label class="check"><input type="checkbox" data-type-filter="Technical" /> Technical</label>
+                  <label class="check"><input type="checkbox" data-type-filter="Freediving" checked /> Freediving</label>
+                </div>
+
+                <div id="diveList"></div>
+                <p id="noResults" class="empty hidden">No dives found for the current filters.</p>
+              </aside>
+
+              <section class="detail">
+                <div class="detail-top">
+                  <div>
+                    <h2 id="detailTitle" class="detail-title">Dive #54 - July 15, 2024</h2>
+                    <p id="detailSub" class="detail-sub">◷ 09:30 AM • 📍 Red Sea, Egypt - Ras Mohammed</p>
+                  </div>
+                  <div class="detail-top-actions">
+                    <button id="editDiveButton" class="btn-ghost" type="button">✏️ Upravit</button>
+                    <button id="deleteDiveButton" class="btn-ghost danger" type="button">🗑 Smazat</button>
+                    <div class="export-wrap">
+                      <button id="exportDiveButton" class="btn-ghost" type="button">⬇ Export</button>
+                      <div id="exportMenu" class="export-menu hidden">
+                        <button type="button" id="exportCurrentJSON">JSON (tento ponor)</button>
+                        <button type="button" id="exportAllJSON">JSON (všechny ponory)</button>
+                        <button type="button" id="exportAllCSV">CSV (všechny ponory)</button>
+                      </div>
+                    </div>
+                    <label class="btn-ghost import-label" for="importDivesInput" title="Importovat ponory z JSON souboru">⬆ Import</label>
+                    <input type="file" id="importDivesInput" class="hidden" accept=".json" />
+                    <button id="newLogButton" class="new-log" type="button">New Dive Log</button>
+                  </div>
+                </div>
+
+                <div class="detail-grid">
+                  <div>
+                    <img id="heroImage" class="hero" src="" alt="Dive site" />
+                    <h3 class="subhead">Dive Profile</h3>
+                    <div class="profile">
+                      <svg id="diveProfileSvg" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg" aria-label="Dive profile graph">
+                        <g id="diveProfileGrid"></g>
+                        <polyline id="diveProfileLine" points="" fill="none" stroke="#4f89a8" stroke-width="1.7" />
+                      </svg>
+                    </div>
+                    <div class="notes-box">
+                      <textarea
+                        id="notesInput"
+                        class="notes-input"
+                        placeholder="Napiš si poznámky z ponoru: co jsi viděl, podmínky, zajímavosti..."
+                      ></textarea>
+                    </div>
+                    <div id="detailOsmMap" class="map" aria-label="Dive location map"></div>
+                  </div>
+
+                  <div>
+                    <h3 class="subhead">General Dive Information</h3>
+                    <p class="line"><b>Location:</b> <span id="infoLocation"></span></p>
+                    <p class="line"><b>Site Name:</b> <span id="infoSiteName"></span></p>
+                    <p class="line"><b>Dive Buddy:</b> <span id="infoBuddy"></span></p>
+                    <p class="line"><b>Weather:</b> <span id="infoWeather"></span></p>
+                    <p class="line"><b>Water Temperature:</b> <span id="infoTemp"></span></p>
+                    <p class="line"><b>Current:</b> <span id="infoCurrent"></span></p>
+                    <p class="line"><b>Visibility:</b> <span id="infoVisibility"></span></p>
+
+                    <h3 class="subhead">Cylinder & Gas</h3>
+                    <p class="line"><b>Start Pressure:</b> <span id="infoStartPressure"></span></p>
+                    <p class="line"><b>End Pressure:</b> <span id="infoEndPressure"></span></p>
+                    <p class="line"><b>Tank Type:</b> <span id="infoTankType"></span></p>
+                    <p class="line"><b>Gas Mix:</b></p>
+                    <div id="gasMixChips" class="chips"></div>
+
+                    <h3 class="subhead">Equipment</h3>
+                    <div id="equipmentChips" class="chips"></div>
+
+                    <h3 class="subhead">Seen Wildlife</h3>
+                    <div id="wildlifeChips" class="chips"></div>
+
+                    <h3 class="subhead">Photos</h3>
+                    <div id="photos" class="photos"></div>
+                  </div>
+                </div>
+              </section>
+              </div>
+            </section>
+
+            <section class="tab-pane hidden" data-tab-content="statistics">
+              <div class="alt-panel">
+                <h2 class="alt-title">Dive Statistics</h2>
+                <div class="alt-grid two">
+                  <article class="alt-card">
+                    <p class="alt-label">Total Dives</p>
+                    <p id="statsTotalDives" class="alt-value">0</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">Average Depth</p>
+                    <p id="statsAvgDepth" class="alt-value">0 m</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">Average Duration</p>
+                    <p id="statsAvgDuration" class="alt-value">0 min</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">Top Location</p>
+                    <p id="statsTopLocation" class="alt-value small">-</p>
+                  </article>
+                </div>
+
+                <h3 class="subhead">Rekordy &amp; Přehledy</h3>
+                <div class="alt-grid two">
+                  <article class="alt-card">
+                    <p class="alt-label">Nejhlubší ponor</p>
+                    <p id="statsDeepest" class="alt-value">0 m</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">Nejdelší ponor</p>
+                    <p id="statsLongest" class="alt-value">0 min</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">Celkový čas</p>
+                    <p id="statsTotalTime" class="alt-value">0 h</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">Destinace</p>
+                    <p id="statsDestinations" class="alt-value">0</p>
+                  </article>
+                </div>
+
+                <h3 class="subhead">Gas Usage</h3>
+                <div class="alt-grid two">
+                  <article class="alt-card">
+                    <p class="alt-label">Air Mix Dives</p>
+                    <p id="statsAirMix" class="alt-value">0</p>
+                  </article>
+                  <article class="alt-card">
+                    <p class="alt-label">EANx Dives</p>
+                    <p id="statsEanxMix" class="alt-value">0</p>
+                  </article>
+                </div>
+              </div>
+            </section>
+
+            <section class="tab-pane hidden" data-tab-content="map">
+              <div class="alt-panel">
+                <h2 class="alt-title">Dive Map</h2>
+                <div id="osmMap" class="map-large" aria-label="OpenStreetMap of dive locations"></div>
+                <h3 class="subhead">Locations</h3>
+                <div id="mapLocations" class="stack-list"></div>
+              </div>
+            </section>
+
+            <section class="tab-pane hidden" data-tab-content="equipment">
+              <div class="equipment-layout">
+                <div class="equipment-inventory">
+                  <div class="equipment-head">
+                    <h2 class="alt-title">Moje výbava</h2>
+                    <button id="addGearButton" class="new-log" type="button">+ Přidat</button>
+                  </div>
+                  <div id="gearCategoryFilter" class="forum-category-list"></div>
+                  <div id="gearList" class="gear-grid"></div>
+                </div>
+                <div class="equipment-usage">
+                  <h2 class="alt-title">Použití v logbuku</h2>
+                  <p class="alt-sub">Jak často jste výbavu použili ve svých ponorech.</p>
+                  <div id="equipmentSummary" class="stack-list"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="tab-pane hidden" data-tab-content="community">
+              <div class="alt-panel">
+                <h2 class="alt-title">Nedávná aktivita</h2>
+                <p class="alt-sub">Poslední příspěvky z fóra. Přidávej nové tipy v záložce <strong>Forum</strong>.</p>
+                <div id="communityFeed" class="stack-list"></div>
+              </div>
+            </section>
+
+            <section class="tab-pane hidden" data-tab-content="forum">
+              <div class="alt-panel forum-layout">
+                <div class="forum-form-card">
+                  <h2 class="alt-title">Forum</h2>
+                  <p class="alt-sub">Sdílej tipy, lokace a zkušenosti s ostatními potápěči.</p>
+                  <form id="forumForm" class="form-grid">
+                    <label class="form-field">
+                      <span>Téma</span>
+                      <select id="forumCategory" required>
+                        <option value="Tip">Tip</option>
+                        <option value="Lokalita">Lokalita</option>
+                        <option value="Výbava">Výbava</option>
+                        <option value="Bezpečnost">Bezpečnost</option>
+                      </select>
+                    </label>
+                    <label class="form-field">
+                      <span>Místo</span>
+                      <input id="forumLocation" type="text" placeholder="např. Dahab, Blue Hole" required />
+                    </label>
+                    <label class="form-field full">
+                      <span>Nadpis</span>
+                      <input id="forumTitle" type="text" placeholder="Krátký název příspěvku" required />
+                    </label>
+                    <label class="form-field full">
+                      <span>Zpráva</span>
+                      <textarea id="forumMessage" rows="4" placeholder="Napiš svůj tip nebo doporučení..." required></textarea>
+                    </label>
+                    <div class="form-actions full">
+                      <button id="forumClear" class="btn-muted" type="button">Vymazat</button>
+                      <button class="btn-primary" type="submit">Přidat příspěvek</button>
+                    </div>
+                  </form>
+                </div>
+                <div class="forum-list-card">
+                  <h3 class="subhead">Příspěvky komunity</h3>
+                  <div class="forum-toolbar">
+                    <input id="forumSearch" class="search" type="search" placeholder="Hledat ve fóru" />
+                    <button id="forumResetFilters" class="btn-muted" type="button">Reset filtrů</button>
+                  </div>
+                  <h4 class="section-title">Kategorie</h4>
+                  <div id="forumCategoryFilters" class="forum-category-list"></div>
+                  <div id="forumFeed" class="stack-list"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="newDiveModal" class="modal hidden" aria-label="New Dive Log form" aria-modal="true" role="dialog">
+        <div class="modal-card">
+          <div class="modal-head">
+            <h2 id="newDiveModalTitle" class="modal-title">New Dive Log</h2>
+            <button id="closeNewDiveModal" class="modal-close" type="button">✕</button>
+          </div>
+
+          <form id="newDiveForm" class="form-grid">
+            <label class="form-field">
+              <span>Dive Number</span>
+              <input id="formDiveNumber" name="diveNumber" type="text" readonly />
+            </label>
+            <label class="form-field">
+              <span>Date</span>
+              <input id="formDate" name="date" type="date" required />
+            </label>
+            <label class="form-field">
+              <span>Time</span>
+              <input id="formTime" name="time" type="time" required />
+            </label>
+            <label class="form-field">
+              <span>Dive Type</span>
+              <select id="formType" name="type" required>
+                <option value="" selected disabled>Vyber typ ponoru</option>
+                <option value="Recreational">Recreational</option>
+                <option value="Technical">Technical</option>
+                <option value="Freediving">Freediving</option>
+              </select>
+            </label>
+
+            <div class="form-section-head full">📍 Místo ponoru</div>
+            <label class="form-field full">
+              <span>Location</span>
+              <input id="formLocation" name="location" type="text" required />
+            </label>
+            <label class="form-field full">
+              <span>Site Name</span>
+              <input id="formSiteName" name="siteName" type="text" required />
+            </label>
+            <label class="form-field full">
+              <span>Dive Buddy</span>
+              <input id="formDiveBuddy" name="diveBuddy" type="text" placeholder="Solo nebo jméno partnera" />
+            </label>
+
+            <div class="form-section-head full">🤿 Parametry ponoru</div>
+            <label class="form-field">
+              <span>Depth (m)</span>
+              <input id="formDepth" name="depth" type="number" min="0" step="0.1" required />
+            </label>
+            <label class="form-field">
+              <span>Duration (min)</span>
+              <input id="formDuration" name="duration" type="number" min="1" step="1" required />
+            </label>
+
+            <label class="form-field full">
+              <span>Dive Profile body (čas v min, hloubka v m; každý řádek např. 0,0)</span>
+              <textarea
+                id="formProfilePoints"
+                name="profilePoints"
+                rows="4"
+                placeholder="0,0&#10;4,8&#10;10,20&#10;28,22&#10;34,5&#10;38,5&#10;48,0"
+              ></textarea>
+            </label>
+            <div class="form-section-head full">🌡️ Podmínky</div>
+            <label class="form-field">
+              <span>Water Temperature (°C)</span>
+              <input id="formWaterTemperature" name="waterTemperature" type="number" step="0.1" required />
+            </label>
+            <label class="form-field">
+              <span>Visibility (%)</span>
+              <input id="formVisibility" name="visibility" type="number" min="0" max="100" required />
+            </label>
+            <label class="form-field">
+              <span>Current (m)</span>
+              <input id="formCurrent" name="current" type="number" step="0.1" required />
+            </label>
+            <label class="form-field">
+              <span>Weather</span>
+              <input id="formWeather" name="weather" type="text" required />
+            </label>
+
+            <div class="form-section-head full">🔧 Vybavení &amp; Plyn</div>
+            <label class="form-field">
+              <span>Start Pressure</span>
+              <input id="formStartPressure" name="startPressure" type="text" required />
+            </label>
+            <label class="form-field">
+              <span>End Pressure</span>
+              <input id="formEndPressure" name="endPressure" type="text" required />
+            </label>
+            <label class="form-field full">
+              <span>Tank Type</span>
+              <input id="formTankType" name="tankType" type="text" required />
+            </label>
+
+            <label class="form-field full">
+              <span>Gas Mix (oddělené čárkou)</span>
+              <input id="formGasMix" name="gasMix" type="text" placeholder="Air, EANx 32%" required />
+            </label>
+            <div class="form-field full">
+              <span>Equipment</span>
+              <div id="formEquipmentGrid" class="gear-check-grid"></div>
+              <p class="form-field-hint">Vyberte výbavu z inventáře. Položky spravujete v záložce <strong>Equipment</strong>.</p>
+            </div>
+            <label class="form-field full">
+              <span>Fauna (oddělené čárkou, volitelné)</span>
+              <input id="formWildlife" name="wildlife" type="text" placeholder="Coral, Turtle" />
+            </label>
+
+            <div class="form-section-head full">🗺️ Poloha</div>
+            <label class="form-field">
+              <span>Latitude</span>
+              <input id="formLatitude" name="latitude" type="number" step="0.0001" min="-90" max="90" required />
+            </label>
+            <label class="form-field">
+              <span>Longitude</span>
+              <input id="formLongitude" name="longitude" type="number" step="0.0001" min="-180" max="180" required />
+            </label>
+
+            <div class="form-field full">
+              <span>Vyber místo kliknutím do mapy</span>
+              <div id="formLocationMap" class="form-map" aria-label="Map picker for dive location"></div>
+              <p id="formMapHint" class="form-hint">Klikni do mapy pro automatické vyplnění pozice.</p>
+            </div>
+
+            <div class="form-section-head full">📸 Média &amp; Poznámky</div>
+            <label class="form-field full">
+              <span>Hero Image URL (volitelné)</span>
+              <input id="formHeroImage" name="heroImage" type="url" />
+            </label>
+            <label class="form-field full">
+              <span>Photos URL (oddělené čárkou, volitelné)</span>
+              <input id="formPhotos" name="photos" type="text" placeholder="https://..., https://..." />
+            </label>
+
+            <label class="form-field full">
+              <span>Notes (každý řádek = jedna poznámka)</span>
+              <textarea id="formNotes" name="notes" rows="4"></textarea>
+            </label>
+
+            <div class="form-actions full">
+              <button id="cancelNewDive" class="btn-muted" type="button">Cancel</button>
+              <button id="submitDiveFormBtn" class="btn-primary" type="submit">Create Dive Log</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="profileModal" class="modal hidden" aria-label="Edit profile" aria-modal="true" role="dialog">
+        <div class="modal-card compact">
+          <div class="modal-head">
+            <h2 class="modal-title">Edit Profile</h2>
+            <button id="closeProfileModal" class="modal-close" type="button">✕</button>
+          </div>
+
+          <form id="profileForm" class="form-grid">
+            <label class="form-field">
+              <span>Display Name</span>
+              <input id="profileName" name="name" type="text" required />
+            </label>
+            <label class="form-field">
+              <span>Email</span>
+              <input id="profileEmail" name="email" type="email" required />
+            </label>
+            <label class="form-field">
+              <span>Certification</span>
+              <input id="profileCertification" name="certification" type="text" required />
+            </label>
+            <label class="form-field">
+              <span>Home Location</span>
+              <input id="profileHomeLocation" name="homeLocation" type="text" required />
+            </label>
+            <div class="form-field full avatar-upload-field">
+              <span>Profilová fotka</span>
+              <div class="avatar-upload-wrap">
+                <img id="profileAvatarPreview" class="avatar-upload-preview" src="assets/logo.png" alt="Náhled avataru" />
+                <label class="avatar-upload-label" for="profileAvatarFile">Nahrát foto</label>
+                <input id="profileAvatarFile" class="avatar-upload-input" name="avatarFile" type="file" accept="image/*" />
+              </div>
+            </div>
+            <label class="form-field full">
+              <span>Bio</span>
+              <textarea id="profileBio" name="bio" rows="4" required></textarea>
+            </label>
+
+            <div class="form-actions full">
+              <button id="cancelProfile" class="btn-muted" type="button">Cancel</button>
+              <button class="btn-primary" type="submit">Save Profile</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="settingsModal" class="modal hidden" aria-label="Settings" aria-modal="true" role="dialog">
+        <div class="modal-card compact">
+          <div class="modal-head">
+            <h2 class="modal-title">Settings</h2>
+            <button id="closeSettingsModal" class="modal-close" type="button">✕</button>
+          </div>
+
+          <div class="form-grid">
+            <label class="form-field full">
+              <span>Appearance</span>
+              <select id="themeSelect">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+
+            <fieldset class="form-field full settings-block">
+              <legend>Password</legend>
+              <label class="form-field">
+                <span>Current Password</span>
+                <input id="currentPassword" type="password" />
+              </label>
+              <label class="form-field">
+                <span>New Password</span>
+                <input id="newPassword" type="password" />
+              </label>
+              <label class="form-field">
+                <span>Confirm New Password</span>
+                <input id="confirmPassword" type="password" />
+              </label>
+              <div class="form-actions">
+                <button id="changePasswordButton" class="btn-primary" type="button">Change Password</button>
+              </div>
+              <p id="passwordStatus" class="form-hint"></p>
+            </fieldset>
+
+            <div class="form-field full settings-block">
+              <span>Login History</span>
+              <div id="loginHistoryList" class="stack-list"></div>
+            </div>
+
+            <div class="form-actions full">
+              <button id="closeSettingsFooter" class="btn-muted" type="button">Close</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="copyright">© <span id="copyrightYear"></span> YourDiveLog Inc. All rights reserved.</p>
+
+      <!-- Gear Modal -->
+      <section id="gearModal" class="modal hidden" aria-label="Gear form" aria-modal="true" role="dialog">
+        <div class="modal-card compact">
+          <div class="modal-head">
+            <h2 id="gearModalTitle" class="modal-title">Přidat výbavu</h2>
+            <button id="closeGearModal" class="modal-close" type="button">✕</button>
+          </div>
+          <form id="gearForm" class="form-grid">
+            <input type="hidden" id="gearId" />
+            <label class="form-field">
+              <span>Název</span>
+              <input id="gearName" type="text" placeholder="např. Scubapro MK25" required />
+            </label>
+            <label class="form-field">
+              <span>Kategorie</span>
+              <select id="gearCategory" required>
+                <option value="Maska">Maska</option>
+                <option value="BCD">BCD</option>
+                <option value="Regulátor">Regulátor</option>
+                <option value="Ploutve">Ploutve</option>
+                <option value="Oblek">Oblek</option>
+                <option value="Počítač">Počítač</option>
+                <option value="Svítilna">Svítilna</option>
+                <option value="Kompas">Kompas</option>
+                <option value="Nůž">Nůž</option>
+                <option value="Ostatní">Ostatní</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span>Značka</span>
+              <input id="gearBrand" type="text" placeholder="např. Scubapro" />
+            </label>
+            <label class="form-field">
+              <span>Stav</span>
+              <select id="gearStatus">
+                <option value="good">✅ Dobrý stav</option>
+                <option value="service">⚠️ Potřebuje servis</option>
+                <option value="overdue">🔴 Servis po termínu</option>
+              </select>
+            </label>
+            <label class="form-field full">
+              <span>Datum posledního servisu</span>
+              <input id="gearLastService" type="date" />
+            </label>
+            <label class="form-field full">
+              <span>Poznámky</span>
+              <textarea id="gearNotes" rows="3" placeholder="Poznámky k výbavě..."></textarea>
+            </label>
+            <div class="form-actions full">
+              <button id="cancelGear" class="btn-muted" type="button">Zrušit</button>
+              <button class="btn-primary" type="submit">Uložit</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+      <div id="equipmentAlert" class="equipment-alert hidden" role="alert">
+        <span id="equipmentAlertMsg" class="equipment-alert-msg"></span>
+        <button id="equipmentAlertGo" class="equipment-alert-go" type="button">Zobrazit výbavu</button>
+        <button id="equipmentAlertDismiss" class="equipment-alert-dismiss" type="button" aria-label="Zavřít">✕</button>
+      </div>
+
+      <!-- Confirm Delete Modal -->
+      <section id="confirmModal" class="modal hidden" aria-label="Potvrdit smazání" aria-modal="true" role="dialog">
+        <div class="modal-card compact">
+          <div class="modal-head">
+            <h2 class="modal-title">Smazat ponor</h2>
+          </div>
+          <p id="confirmModalMsg" class="confirm-modal-msg">Opravdu smazat tento ponor? Tuto akci nelze vrátit.</p>
+          <div class="form-actions">
+            <button id="confirmModalCancel" class="btn-muted" type="button">Zrušit</button>
+            <button id="confirmModalConfirm" class="btn-danger" type="button">Smazat</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Photo Lightbox -->
+      <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Photo viewer">
+        <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Zavřít">✕</button>
+        <button id="lightboxPrev" class="lightbox-nav lightbox-prev" type="button" aria-label="Předchozí foto">&#8249;</button>
+        <div class="lightbox-stage">
+          <img id="lightboxImg" class="lightbox-img" src="" alt="Dive photo" />
+          <p id="lightboxCaption" class="lightbox-caption"></p>
+        </div>
+        <button id="lightboxNext" class="lightbox-nav lightbox-next" type="button" aria-label="Další foto">&#8250;</button>
+      </div>
+    </main>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
