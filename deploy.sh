@@ -6,9 +6,13 @@ DEST="/var/www/html/divelog"
 SERVER_DIR="/opt/divelog-server"
 JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
 
-echo "=== 1/5 Instalace nginx a Node.js ==="
+echo "=== 1/5 Instalace nginx, Node.js a Postfix ==="
 apt-get update -qq
-apt-get install -y nginx nodejs npm -qq
+# Postfix noninteractive setup: Internet Site
+DEBIAN_FRONTEND=noninteractive apt-get install -y nginx nodejs npm postfix -qq
+# Make sure postfix is running
+systemctl enable postfix --quiet
+systemctl start postfix
 
 echo "=== 2/5 Stahuji soubory frontendu ==="
 mkdir -p "$DEST/assets"
@@ -34,14 +38,14 @@ if [ ! -f "$SERVER_DIR/.env" ]; then
   echo "JWT_SECRET=$JWT_SECRET" > "$SERVER_DIR/.env"
   echo "PORT=3000" >> "$SERVER_DIR/.env"
   echo "DB_DIR=$SERVER_DIR/data" >> "$SERVER_DIR/.env"
-  echo "SENDGRID_API_KEY=" >> "$SERVER_DIR/.env"
-  echo "FROM_EMAIL=" >> "$SERVER_DIR/.env"
+  echo "FROM_EMAIL=no-reply@yourdivelog.cz" >> "$SERVER_DIR/.env"
   echo "APP_URL=http://194.182.80.24" >> "$SERVER_DIR/.env"
 else
   # Add missing env vars to existing .env
-  grep -q "^SENDGRID_API_KEY" "$SERVER_DIR/.env" || echo "SENDGRID_API_KEY=" >> "$SERVER_DIR/.env"
-  grep -q "^FROM_EMAIL" "$SERVER_DIR/.env"       || echo "FROM_EMAIL=" >> "$SERVER_DIR/.env"
-  grep -q "^APP_URL" "$SERVER_DIR/.env"          || echo "APP_URL=http://194.182.80.24" >> "$SERVER_DIR/.env"
+  grep -q "^FROM_EMAIL" "$SERVER_DIR/.env" || echo "FROM_EMAIL=no-reply@yourdivelog.cz" >> "$SERVER_DIR/.env"
+  grep -q "^APP_URL" "$SERVER_DIR/.env"    || echo "APP_URL=http://194.182.80.24" >> "$SERVER_DIR/.env"
+  # Remove old SendGrid key if present (no longer needed)
+  sed -i '/^SENDGRID_API_KEY/d' "$SERVER_DIR/.env" 2>/dev/null || true
 fi
 
 cd "$SERVER_DIR"

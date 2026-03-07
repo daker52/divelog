@@ -1,21 +1,23 @@
-const sgMail = require("@sendgrid/mail");
+const nodemailer = require("nodemailer");
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || "";
-const FROM_EMAIL = process.env.FROM_EMAIL || "no-reply@yourdivelog.com";
-const APP_URL = process.env.APP_URL || "http://194.182.80.24";
+const FROM_EMAIL = process.env.FROM_EMAIL || "no-reply@yourdivelog.cz";
+const APP_URL   = process.env.APP_URL   || "http://194.182.80.24";
 
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
-} else {
-  console.warn("[email] SENDGRID_API_KEY není nastaven – emaily se odesílat nebudou.");
-}
+// Use local Postfix (sendmail transport = zero config, relies on system MTA)
+const transporter = nodemailer.createTransport({
+  sendmail: true,
+  newline: "unix",
+  path: "/usr/sbin/sendmail",
+});
 
 async function sendMail(to, subject, html) {
-  if (!SENDGRID_API_KEY) {
-    console.log(`[email] (dry-run) To: ${to} | ${subject}`);
-    return;
+  try {
+    await transporter.sendMail({ from: FROM_EMAIL, to, subject, html });
+    console.log(`[email] Sent to ${to}: ${subject}`);
+  } catch (err) {
+    console.error(`[email] Failed to send to ${to}:`, err.message);
+    throw err;
   }
-  await sgMail.send({ to, from: FROM_EMAIL, subject, html });
 }
 
 async function sendVerificationEmail(email, username, token) {
