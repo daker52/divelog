@@ -126,7 +126,7 @@ router.post("/reset-password", (req, res) => {
 
 // GET /api/auth/profile
 router.get("/profile", auth, (req, res) => {
-  const user = db.prepare("SELECT id,username,email,email_verified,certification,home_location,bio,avatar_url,created_at FROM users WHERE id=?").get(req.user.id);
+  const user = db.prepare("SELECT id,username,email,email_verified,certification,home_location,bio,avatar_url,settings,created_at FROM users WHERE id=?").get(req.user.id);
   if (!user) return res.status(404).json({ error: "Uzivatel nenalezen." });
   res.json(user);
 });
@@ -137,8 +137,26 @@ router.put("/profile", auth, (req, res) => {
   db.prepare(
     "UPDATE users SET username=COALESCE(?,username), certification=COALESCE(?,certification), home_location=COALESCE(?,home_location), bio=COALESCE(?,bio), avatar_url=COALESCE(?,avatar_url) WHERE id=?"
   ).run(username, certification, home_location, bio, avatar_url, req.user.id);
-  const user = db.prepare("SELECT id,username,email,email_verified,certification,home_location,bio,avatar_url FROM users WHERE id=?").get(req.user.id);
+  const user = db.prepare("SELECT id,username,email,email_verified,certification,home_location,bio,avatar_url,settings FROM users WHERE id=?").get(req.user.id);
   res.json(user);
+});
+
+// GET /api/auth/settings
+router.get("/settings", auth, (req, res) => {
+  const row = db.prepare("SELECT settings FROM users WHERE id=?").get(req.user.id);
+  if (!row) return res.status(404).json({ error: "Uzivatel nenalezen." });
+  try {
+    res.json(JSON.parse(row.settings || "null") || {});
+  } catch {
+    res.json({});
+  }
+});
+
+// PUT /api/auth/settings
+router.put("/settings", auth, (req, res) => {
+  const settings = req.body || {};
+  db.prepare("UPDATE users SET settings=? WHERE id=?").run(JSON.stringify(settings), req.user.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

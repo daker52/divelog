@@ -67,10 +67,9 @@ let geocodeRequestId = 0;
 /* Default map centre (Red Sea / Ras Mohammed area) */
 const DEFAULT_MAP_CENTER = [27.73, 34.25];
 
-const STORAGE_KEYS = {
-  profile: "ydl.profile",
-  settings: "ydl.settings",
-};
+// localStorage contains ONLY the JWT token and currentUser cache.
+// All user data (dives, gear, forum, profile, settings) lives on the server.
+const STORAGE_KEYS = {}; // kept for backwards-compat cleanup in loadPersistedState
 
 /* ── API & Auth ────────────────────────────────────────────── */
 const API_BASE = "/api";
@@ -153,15 +152,16 @@ async function deleteForumPostFromAPI(dbId) {
 async function loadDataFromAPI() {
   if (!getToken()) return false;
   try {
-    const [divesRes, gearRes, forumRes, profileRes] = await Promise.all([
+    const [divesRes, gearRes, forumRes, profileRes, settingsRes] = await Promise.all([
       apiFetch("/dives"),
       apiFetch("/gear"),
       apiFetch("/forum"),
       apiFetch("/auth/profile"),
+      apiFetch("/auth/settings"),
     ]);
     if (!divesRes.ok) { clearToken(); return false; }
-    const [apiDives, apiGear, apiPosts, apiProfile] = await Promise.all([
-      divesRes.json(), gearRes.json(), forumRes.json(), profileRes.json(),
+    const [apiDives, apiGear, apiPosts, apiProfile, apiSettings] = await Promise.all([
+      divesRes.json(), gearRes.json(), forumRes.json(), profileRes.json(), settingsRes.json(),
     ]);
     if (Array.isArray(apiDives)) { dives.length = 0; dives.push(...apiDives); }
     if (Array.isArray(apiGear)) appState.gear = apiGear;
@@ -173,6 +173,14 @@ async function loadDataFromAPI() {
       appState.profile.homeLocation = apiProfile.home_location || appState.profile.homeLocation;
       appState.profile.bio          = apiProfile.bio           || appState.profile.bio;
       appState.profile.avatarUrl    = apiProfile.avatar_url    || appState.profile.avatarUrl;
+    }
+    if (apiSettings && typeof apiSettings === "object" && !Array.isArray(apiSettings)) {
+      appState.settings = {
+        ...appState.settings,
+        ...apiSettings,
+        loginHistory: Array.isArray(apiSettings.loginHistory) ? apiSettings.loginHistory : appState.settings.loginHistory,
+      };
+      if (apiSettings.theme) applyTheme(apiSettings.theme);
     }
     return true;
   } catch { return false; }
@@ -484,41 +492,15 @@ function safeJsonParse(rawValue) {
 }
 
 function loadPersistedState() {
-  // Clear old stale keys from previous versions
-  ["ydl.dives", "ydl.gear", "ydl.forumPosts"].forEach(k => localStorage.removeItem(k));
-
-  // Only settings and minimal profile (no avatarUrl) come from localStorage
-  const storedProfile = safeJsonParse(localStorage.getItem(STORAGE_KEYS.profile));
-  if (storedProfile) {
-    const { avatarUrl, ...safe } = storedProfile;
-    appState.profile = { ...appState.profile, ...safe };
-  }
-
-  const storedSettings = safeJsonParse(localStorage.getItem(STORAGE_KEYS.settings));
-  if (storedSettings) {
-    appState.settings = {
-      ...appState.settings,
-      ...storedSettings,
-      loginHistory: Array.isArray(storedSettings.loginHistory) ? storedSettings.loginHistory : [],
-    };
-  }
+  // Clear ALL old localStorage keys - everything lives on server now
+  ["ydl.profile", "ydl.settings", "ydl.dives", "ydl.gear", "ydl.forumPosts"].forEach(k => localStorage.removeItem(k));
 }
 
-function persistProfile() {
-  // Exclude avatarUrl from localStorage – it's large (base64) and lives on the server
-  const { avatarUrl, ...profileWithoutAvatar } = appState.profile;
-  try {
-    localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profileWithoutAvatar));
-  } catch (e) {
-    // quota – try without optional fields too
-    try {
-      localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify({ name: profileWithoutAvatar.name, email: profileWithoutAvatar.email }));
-    } catch {}
-  }
-}
+function persistProfile() { /* profile lives on server - saved via apiFetch PUT /auth/profile */ }
 
 function persistSettings() {
-  localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(appState.settings));
+  if (!getToken()) return;
+  try { apiFetch("/auth/settings", { method: "PUT", body: appState.settings }); } catch {}
 }
 
 function persistDives() {

@@ -57,6 +57,7 @@ const colsToAdd = [
   ["verification_token",  "TEXT DEFAULT NULL"],
   ["reset_token",         "TEXT DEFAULT NULL"],
   ["reset_token_expires", "TEXT DEFAULT NULL"],
+  ["settings",            "TEXT DEFAULT NULL"],
 ];
 for (const [col, def] of colsToAdd) {
   if (!existingCols.includes(col)) {
