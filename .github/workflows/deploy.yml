@@ -9,26 +9,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy via SSH + SCP
-        env:
-          SSH_PASS: ${{ secrets.SSH_PASS }}
-        run: |
-          sudo apt-get install -y sshpass rsync
-          HOST="[2001:15e8:110:7d00::940]"
-          SSHPASS="$SSH_PASS"
-          export SSHPASS
-
-          # Připravit adresář a nginx na serveru
-          sshpass -e ssh -o StrictHostKeyChecking=no -p 22 \
-            root@2001:15e8:110:7d00::940 \
-            'apt-get install -y nginx 2>/dev/null; mkdir -p /var/www/html/divelog; systemctl enable nginx; systemctl start nginx || true'
-
-          # Zkopírovat soubory
-          sshpass -e scp -o StrictHostKeyChecking=no -P 22 -r \
-            index.html app.js styles.css manifest.json sw.js assets/ \
-            root@[2001:15e8:110:7d00::940]:/var/www/html/divelog/
-
-          echo "Deploy hotov!"
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 194.182.80.24
+          username: root
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            curl -fsSL https://raw.githubusercontent.com/daker52/divelog/main/deploy.sh | bash
