@@ -70,9 +70,6 @@ const DEFAULT_MAP_CENTER = [27.73, 34.25];
 const STORAGE_KEYS = {
   profile: "ydl.profile",
   settings: "ydl.settings",
-  dives: "ydl.dives",
-  gear: "ydl.gear",
-  forumPosts: "ydl.forumPosts",
 };
 
 /* ── API & Auth ────────────────────────────────────────────── */
@@ -129,7 +126,7 @@ async function syncGearToAPI(item) {
         const d = await res.json();
         item._dbId = d._dbId;
         // persist gear state so _dbId is saved
-        try { localStorage.setItem("ydl.gear", JSON.stringify(appState.gear)); } catch {}
+        /* gear lives on server only */
       }
     }
   } catch {}
@@ -487,9 +484,14 @@ function safeJsonParse(rawValue) {
 }
 
 function loadPersistedState() {
+  // Clear old stale keys from previous versions
+  ["ydl.dives", "ydl.gear", "ydl.forumPosts"].forEach(k => localStorage.removeItem(k));
+
+  // Only settings and minimal profile (no avatarUrl) come from localStorage
   const storedProfile = safeJsonParse(localStorage.getItem(STORAGE_KEYS.profile));
   if (storedProfile) {
-    appState.profile = { ...appState.profile, ...storedProfile };
+    const { avatarUrl, ...safe } = storedProfile;
+    appState.profile = { ...appState.profile, ...safe };
   }
 
   const storedSettings = safeJsonParse(localStorage.getItem(STORAGE_KEYS.settings));
@@ -500,26 +502,19 @@ function loadPersistedState() {
       loginHistory: Array.isArray(storedSettings.loginHistory) ? storedSettings.loginHistory : [],
     };
   }
-
-  const storedDives = safeJsonParse(localStorage.getItem(STORAGE_KEYS.dives));
-  if (Array.isArray(storedDives) && storedDives.length > 0) {
-    dives.length = 0;
-    dives.push(...storedDives);
-  }
-
-  const storedGear = safeJsonParse(localStorage.getItem(STORAGE_KEYS.gear));
-  if (Array.isArray(storedGear) && storedGear.length > 0) {
-    appState.gear = storedGear;
-  }
-
-  const storedForumPosts = safeJsonParse(localStorage.getItem(STORAGE_KEYS.forumPosts));
-  if (Array.isArray(storedForumPosts)) {
-    appState.forumPosts = storedForumPosts;
-  }
 }
 
 function persistProfile() {
-  localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(appState.profile));
+  // Exclude avatarUrl from localStorage – it's large (base64) and lives on the server
+  const { avatarUrl, ...profileWithoutAvatar } = appState.profile;
+  try {
+    localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(profileWithoutAvatar));
+  } catch (e) {
+    // quota – try without optional fields too
+    try {
+      localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify({ name: profileWithoutAvatar.name, email: profileWithoutAvatar.email }));
+    } catch {}
+  }
 }
 
 function persistSettings() {
@@ -527,16 +522,11 @@ function persistSettings() {
 }
 
 function persistDives() {
-  localStorage.setItem(STORAGE_KEYS.dives, JSON.stringify(dives));
+  // dives live on server – no localStorage persist
 }
 
-function persistGear() {
-  localStorage.setItem(STORAGE_KEYS.gear, JSON.stringify(appState.gear));
-}
-
-function persistForumPosts() {
-  localStorage.setItem(STORAGE_KEYS.forumPosts, JSON.stringify(appState.forumPosts));
-}
+function persistGear() { /* gear lives on server only */ }
+function persistForumPosts() { /* forum lives on server only */ }
 
 /* ── Toast notifications ───────────────────────────────────── */
 function showToast(message, type = "success", duration = 3000) {
