@@ -75,6 +75,102 @@ const STORAGE_KEYS = {
   forumPosts: "ydl.forumPosts",
 };
 
+/* ── API & Auth ────────────────────────────────────────────── */
+const API_BASE = "/api";
+
+function getToken() { return localStorage.getItem("ydl.token"); }
+function setToken(t) { localStorage.setItem("ydl.token", t); }
+function clearToken() { localStorage.removeItem("ydl.token"); localStorage.removeItem("ydl.currentUser"); }
+function setCurrentUserData(u) { localStorage.setItem("ydl.currentUser", JSON.stringify(u)); }
+
+async function apiFetch(path, options = {}) {
+  const token = getToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+  return fetch(API_BASE + path, {
+    ...options,
+    headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+}
+
+async function syncDiveToAPI(dive) {
+  if (!getToken()) return;
+  try {
+    if (dive._dbId) {
+      await apiFetch(`/dives/${dive._dbId}`, { method: "PUT", body: dive });
+    } else {
+      const res = await apiFetch("/dives", { method: "POST", body: dive });
+      if (res.ok) { const d = await res.json(); dive._dbId = d._dbId; }
+    }
+  } catch { /* offline */ }
+}
+
+async function deleteDiveFromAPI(dbId) {
+  if (!getToken() || !dbId) return;
+  try { await apiFetch(`/dives/${dbId}`, { method: "DELETE" }); } catch {}
+}
+
+async function syncGearToAPI(item) {
+  if (!getToken()) return;
+  try {
+    if (item._dbId) {
+      await apiFetch(`/gear/${item._dbId}`, { method: "PUT", body: item });
+    } else {
+      const res = await apiFetch("/gear", { method: "POST", body: item });
+      if (res.ok) { const d = await res.json(); item._dbId = d._dbId; }
+    }
+  } catch {}
+}
+
+async function deleteGearFromAPI(dbId) {
+  if (!getToken() || !dbId) return;
+  try { await apiFetch(`/gear/${dbId}`, { method: "DELETE" }); } catch {}
+}
+
+async function syncForumPostToAPI(post) {
+  if (!getToken() || post._dbId) return;
+  try {
+    const res = await apiFetch("/forum", { method: "POST", body: post });
+    if (res.ok) { const d = await res.json(); post._dbId = d._dbId; post.createdAt = d.createdAt; }
+  } catch {}
+}
+
+async function deleteForumPostFromAPI(dbId) {
+  if (!getToken() || !dbId) return;
+  try { await apiFetch(`/forum/${dbId}`, { method: "DELETE" }); } catch {}
+}
+
+async function loadDataFromAPI() {
+  if (!getToken()) return false;
+  try {
+    const [divesRes, gearRes, forumRes, profileRes] = await Promise.all([
+      apiFetch("/dives"),
+      apiFetch("/gear"),
+      apiFetch("/forum"),
+      apiFetch("/auth/profile"),
+    ]);
+    if (!divesRes.ok) { clearToken(); return false; }
+    const [apiDives, apiGear, apiPosts, apiProfile] = await Promise.all([
+      divesRes.json(), gearRes.json(), forumRes.json(), profileRes.json(),
+    ]);
+    if (Array.isArray(apiDives)) { dives.length = 0; dives.push(...apiDives); }
+    if (Array.isArray(apiGear)) appState.gear = apiGear;
+    if (Array.isArray(apiPosts)) appState.forumPosts = apiPosts;
+    if (apiProfile && apiProfile.id) {
+      appState.profile.name = apiProfile.username || appState.profile.name;
+      appState.profile.email = apiProfile.email || appState.profile.email;
+      appState.profile.certification = apiProfile.certification || appState.profile.certification;
+      appState.profile.homeLocation = apiProfile.home_location || appState.profile.homeLocation;
+      appState.profile.bio = apiProfile.bio || appState.profile.bio;
+    }
+    return true;
+  } catch { return false; }
+}
+
 const dives = [
   {
     id: "54",
@@ -520,7 +616,8 @@ function exportAllDivesCSV() {
 function deleteDive(diveId) {
   const index = dives.findIndex((d) => d.id === diveId);
   if (index < 0) return;
-  dives.splice(index, 1);
+  const removed = dives.splice(index, 1)[0];
+  deleteDiveFromAPI(removed._dbId);
   persistDives();
   appState.selectedDiveId = dives[0]?.id ?? "";
   initLocationOptions();
@@ -1645,6 +1742,8 @@ function bindGearEvents() {
     const deleteBtn = event.target.closest("[data-delete-gear]");
     if (deleteBtn) {
       const id = deleteBtn.dataset.deleteGear;
+      const item = appState.gear.find((g) => g.id === id);
+      if (item) deleteGearFromAPI(item._dbId);
       appState.gear = appState.gear.filter((g) => g.id !== id);
       persistGear();
       renderEquipmentAlert();
@@ -1670,12 +1769,15 @@ function bindGearEvents() {
 
     const existing = appState.gear.findIndex((g) => g.id === id);
     if (existing >= 0) {
+      // preserve _dbId for API updates
+      gearItem._dbId = appState.gear[existing]._dbId;
       appState.gear.splice(existing, 1, gearItem);
     } else {
       appState.gear.push(gearItem);
     }
 
     persistGear();
+    syncGearToAPI(gearItem);
     renderEquipmentAlert();
     closeGearModal();
     renderGearInventory();
@@ -1911,21 +2013,103 @@ function bindNotesEvents() {
       .map((line) => line.trim())
       .filter(Boolean);
     persistDives();
+    syncDiveToAPI(selectedDive);
   });
 }
 
 function bindAuthEvents() {
-  dom.authButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      setPhase("app");
-      addLoginHistoryEntry("Login");
+  const tabs = document.querySelectorAll(".auth-tab");
+  const loginForm = document.getElementById("loginForm");
+  const registerForm = document.getElementById("registerForm");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      const isLogin = tab.dataset.tab === "login";
+      loginForm?.classList.toggle("hidden", !isLogin);
+      registerForm?.classList.toggle("hidden", isLogin);
     });
   });
 
-  dom.logoutButton.addEventListener("click", () => {
-    setPhase("auth");
-    addLoginHistoryEntry("Logout");
+  loginForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = loginForm.querySelector(".auth-submit");
+    const errEl = document.getElementById("loginError");
+    btn.disabled = true;
+    errEl.classList.add("hidden");
+    const fd = new FormData(loginForm);
+    try {
+      const res = await apiFetch("/auth/login", {
+        method: "POST",
+        body: { email: fd.get("email"), password: fd.get("password") },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || "Chyba přihlášení";
+        errEl.classList.remove("hidden");
+        return;
+      }
+      setToken(data.token);
+      setCurrentUserData(data.user);
+      await loadDataFromAPI();
+      finishLogin();
+    } catch {
+      errEl.textContent = "Chyba připojení k serveru.";
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+    }
   });
+
+  registerForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = registerForm.querySelector(".auth-submit");
+    const errEl = document.getElementById("registerError");
+    btn.disabled = true;
+    errEl.classList.add("hidden");
+    const fd = new FormData(registerForm);
+    try {
+      const res = await apiFetch("/auth/register", {
+        method: "POST",
+        body: { username: fd.get("username"), email: fd.get("email"), password: fd.get("password") },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || "Chyba registrace";
+        errEl.classList.remove("hidden");
+        return;
+      }
+      setToken(data.token);
+      setCurrentUserData(data.user);
+      await loadDataFromAPI();
+      finishLogin();
+    } catch {
+      errEl.textContent = "Chyba připojení k serveru.";
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  dom.logoutButton.addEventListener("click", () => {
+    clearToken();
+    addLoginHistoryEntry("Logout");
+    dives.length = 0;
+    appState.gear = [];
+    appState.forumPosts = [];
+    setPhase("auth");
+  });
+}
+
+function finishLogin() {
+  addLoginHistoryEntry("Login");
+  initLocationOptions();
+  syncFilterControls();
+  render();
+  renderTopProfile();
+  renderEquipmentAlert();
+  setPhase("app");
 }
 
 function bindProfileEvents() {
@@ -2065,6 +2249,7 @@ function bindNewDiveFormEvents() {
       dives.unshift(newDive);
     }
     persistDives();
+    syncDiveToAPI(newDive);
     showToast(isEdit ? "Ponor byl upraven ✓" : "Nový ponor byl uložen ✓");
 
     appState.selectedDiveId = newDive.id;
@@ -2139,6 +2324,7 @@ function bindForumEvents() {
 
     appState.forumPosts.unshift(post);
     persistForumPosts();
+    syncForumPostToAPI(post);
     appState.forumFilters.category = "all";
     appState.forumFilters.query = "";
     renderForumTab();
@@ -2148,7 +2334,7 @@ function bindForumEvents() {
   });
 }
 
-function init() {
+async function init() {
   if (dom.copyrightYear) {
     dom.copyrightYear.textContent = String(new Date().getFullYear());
   }
@@ -2179,14 +2365,31 @@ function init() {
   render();
   renderEquipmentAlert();
 
-  window.setTimeout(() => {
-    setPhase("auth");
-  }, 2200);
-
   // Register service worker for PWA / offline support
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {/* silently ignore in file:// */ });
   }
+
+  // Auto-login if token exists
+  if (getToken()) {
+    const ok = await loadDataFromAPI();
+    if (ok) {
+      window.setTimeout(() => {
+        render();
+        renderTopProfile();
+        renderEquipmentAlert();
+        initLocationOptions();
+        setPhase("app");
+      }, 2200);
+      return;
+    }
+    // token invalid/expired
+    clearToken();
+  }
+
+  window.setTimeout(() => {
+    setPhase("auth");
+  }, 2200);
 }
 
 init();

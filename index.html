@@ -34,12 +34,37 @@
 
       <section class="view auth-view" aria-label="Auth view">
         <div class="auth-card">
-          <h1 class="auth-title">YourDiveLog</h1>
-          <p class="auth-subtitle">Vyber, jak chceš pokračovat</p>
-          <div class="auth-actions">
-            <button class="auth-btn primary" data-enter-app>Register</button>
-            <button class="auth-btn secondary" data-enter-app>Login</button>
+          <div class="auth-logo">
+            <img src="assets/logo.png" alt="YourDiveLog" />
+            <h1 class="auth-title">YourDiveLog</h1>
           </div>
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login" type="button">Přihlásit se</button>
+            <button class="auth-tab" data-tab="register" type="button">Registrovat</button>
+          </div>
+          <form id="loginForm" class="auth-form" novalidate>
+            <label>E-mail
+              <input type="email" name="email" autocomplete="email" required placeholder="vas@email.cz" />
+            </label>
+            <label>Heslo
+              <input type="password" name="password" autocomplete="current-password" required placeholder="••••••••" />
+            </label>
+            <p class="auth-error hidden" id="loginError"></p>
+            <button type="submit" class="auth-submit">Přihlásit se</button>
+          </form>
+          <form id="registerForm" class="auth-form hidden" novalidate>
+            <label>Uživatelské jméno
+              <input type="text" name="username" autocomplete="username" required placeholder="Váš nickname" />
+            </label>
+            <label>E-mail
+              <input type="email" name="email" autocomplete="email" required placeholder="vas@email.cz" />
+            </label>
+            <label>Heslo <small>(min. 6 znaků)</small>
+              <input type="password" name="password" autocomplete="new-password" required placeholder="••••••••" />
+            </label>
+            <p class="auth-error hidden" id="registerError"></p>
+            <button type="submit" class="auth-submit">Registrovat</button>
+          </form>
         </div>
       </section>
 
