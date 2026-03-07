@@ -12,26 +12,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASS }}
-          port: 22
-          script: |
-            apt-get install -y nginx rsync 2>/dev/null || true
-            mkdir -p /var/www/html/divelog
-            systemctl enable nginx
-            systemctl start nginx || true
+      - name: Deploy via SSH + SCP
+        env:
+          SSH_PASS: ${{ secrets.SSH_PASS }}
+        run: |
+          sudo apt-get install -y sshpass rsync
+          HOST="[2001:15e8:110:7d00::940]"
+          SSHPASS="$SSH_PASS"
+          export SSHPASS
 
-      - name: Copy files via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASS }}
-          port: 22
-          source: "index.html,app.js,styles.css,manifest.json,sw.js,assets/"
-          target: /var/www/html/divelog/
-          strip_components: 0
+          # Připravit adresář a nginx na serveru
+          sshpass -e ssh -o StrictHostKeyChecking=no -p 22 \
+            root@2001:15e8:110:7d00::940 \
+            'apt-get install -y nginx 2>/dev/null; mkdir -p /var/www/html/divelog; systemctl enable nginx; systemctl start nginx || true'
+
+          # Zkopírovat soubory
+          sshpass -e scp -o StrictHostKeyChecking=no -P 22 -r \
+            index.html app.js styles.css manifest.json sw.js assets/ \
+            root@[2001:15e8:110:7d00::940]:/var/www/html/divelog/
+
+          echo "Deploy hotov!"
