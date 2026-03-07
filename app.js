@@ -104,7 +104,11 @@ async function syncDiveToAPI(dive) {
       await apiFetch(`/dives/${dive._dbId}`, { method: "PUT", body: dive });
     } else {
       const res = await apiFetch("/dives", { method: "POST", body: dive });
-      if (res.ok) { const d = await res.json(); dive._dbId = d._dbId; }
+      if (res.ok) {
+        const d = await res.json();
+        dive._dbId = d._dbId;
+        persistDives(); // uloz _dbId do localStorage
+      }
     }
   } catch { /* offline */ }
 }
@@ -121,7 +125,12 @@ async function syncGearToAPI(item) {
       await apiFetch(`/gear/${item._dbId}`, { method: "PUT", body: item });
     } else {
       const res = await apiFetch("/gear", { method: "POST", body: item });
-      if (res.ok) { const d = await res.json(); item._dbId = d._dbId; }
+      if (res.ok) {
+        const d = await res.json();
+        item._dbId = d._dbId;
+        // persist gear state so _dbId is saved
+        try { localStorage.setItem("ydl.gear", JSON.stringify(appState.gear)); } catch {}
+      }
     }
   } catch {}
 }
@@ -161,11 +170,12 @@ async function loadDataFromAPI() {
     if (Array.isArray(apiGear)) appState.gear = apiGear;
     if (Array.isArray(apiPosts)) appState.forumPosts = apiPosts;
     if (apiProfile && apiProfile.id) {
-      appState.profile.name = apiProfile.username || appState.profile.name;
-      appState.profile.email = apiProfile.email || appState.profile.email;
-      appState.profile.certification = apiProfile.certification || appState.profile.certification;
+      appState.profile.name         = apiProfile.username      || appState.profile.name;
+      appState.profile.email        = apiProfile.email         || appState.profile.email;
+      appState.profile.certification= apiProfile.certification || appState.profile.certification;
       appState.profile.homeLocation = apiProfile.home_location || appState.profile.homeLocation;
-      appState.profile.bio = apiProfile.bio || appState.profile.bio;
+      appState.profile.bio          = apiProfile.bio           || appState.profile.bio;
+      appState.profile.avatarUrl    = apiProfile.avatar_url    || appState.profile.avatarUrl;
     }
     return true;
   } catch { return false; }
@@ -2216,7 +2226,7 @@ function bindProfileEvents() {
     const file = dom.profileAvatarFile.files[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         appState.profile = {
           ...appState.profile,
           name: dom.profileName.value.trim(),
@@ -2229,6 +2239,16 @@ function bindProfileEvents() {
         persistProfile();
         renderTopProfile();
         closeProfileModal();
+        // Sync to API
+        try {
+          await apiFetch("/auth/profile", { method: "PUT", body: {
+            username: appState.profile.name,
+            certification: appState.profile.certification,
+            home_location: appState.profile.homeLocation,
+            bio: appState.profile.bio,
+            avatar_url: appState.profile.avatarUrl,
+          }});
+        } catch {}
       };
       reader.readAsDataURL(file);
       return;
@@ -2246,6 +2266,15 @@ function bindProfileEvents() {
     persistProfile();
     renderTopProfile();
     closeProfileModal();
+    // Sync to API (no avatar change)
+    try {
+      apiFetch("/auth/profile", { method: "PUT", body: {
+        username: appState.profile.name,
+        certification: appState.profile.certification,
+        home_location: appState.profile.homeLocation,
+        bio: appState.profile.bio,
+      }});
+    } catch {}
   });
 }
 
