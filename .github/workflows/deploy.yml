@@ -12,8 +12,8 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 194.182.80.24
-          username: root
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             curl -fsSL https://raw.githubusercontent.com/daker52/divelog/main/deploy.sh | bash
