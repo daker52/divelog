@@ -19,7 +19,7 @@ curl -fsSL "$REPO/assets/logo.png" -o "$DEST/assets/logo.png" 2>/dev/null || tru
 chown -R www-data:www-data "$DEST"
 
 echo "=== 3/5 Stahuji a instaluji backend ==="
-mkdir -p "$SERVER_DIR/routes" "$SERVER_DIR/middleware" "$SERVER_DIR/data"
+mkdir -p "$SERVER_DIR/routes" "$SERVER_DIR/middleware" "$SERVER_DIR/utils" "$SERVER_DIR/data"
 for f in package.json index.js db.js; do
   curl -fsSL "$REPO/server/$f" -o "$SERVER_DIR/$f"
 done
@@ -27,12 +27,21 @@ for f in auth.js dives.js gear.js forum.js; do
   curl -fsSL "$REPO/server/routes/$f" -o "$SERVER_DIR/routes/$f"
 done
 curl -fsSL "$REPO/server/middleware/auth.js" -o "$SERVER_DIR/middleware/auth.js"
+curl -fsSL "$REPO/server/utils/email.js" -o "$SERVER_DIR/utils/email.js"
 
 # Uloz JWT secret trvale
 if [ ! -f "$SERVER_DIR/.env" ]; then
   echo "JWT_SECRET=$JWT_SECRET" > "$SERVER_DIR/.env"
   echo "PORT=3000" >> "$SERVER_DIR/.env"
   echo "DB_DIR=$SERVER_DIR/data" >> "$SERVER_DIR/.env"
+  echo "SENDGRID_API_KEY=" >> "$SERVER_DIR/.env"
+  echo "FROM_EMAIL=" >> "$SERVER_DIR/.env"
+  echo "APP_URL=http://194.182.80.24" >> "$SERVER_DIR/.env"
+else
+  # Add missing env vars to existing .env
+  grep -q "^SENDGRID_API_KEY" "$SERVER_DIR/.env" || echo "SENDGRID_API_KEY=" >> "$SERVER_DIR/.env"
+  grep -q "^FROM_EMAIL" "$SERVER_DIR/.env"       || echo "FROM_EMAIL=" >> "$SERVER_DIR/.env"
+  grep -q "^APP_URL" "$SERVER_DIR/.env"          || echo "APP_URL=http://194.182.80.24" >> "$SERVER_DIR/.env"
 fi
 
 cd "$SERVER_DIR"

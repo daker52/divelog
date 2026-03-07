@@ -50,4 +50,18 @@ db.exec(`
   );
 `);
 
+// Add missing columns for email verification & password reset (safe for existing DBs)
+const existingCols = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+const colsToAdd = [
+  ["email_verified",      "INTEGER DEFAULT 0"],
+  ["verification_token",  "TEXT DEFAULT NULL"],
+  ["reset_token",         "TEXT DEFAULT NULL"],
+  ["reset_token_expires", "TEXT DEFAULT NULL"],
+];
+for (const [col, def] of colsToAdd) {
+  if (!existingCols.includes(col)) {
+    db.prepare(`ALTER TABLE users ADD COLUMN ${col} ${def}`).run();
+  }
+}
+
 module.exports = db;

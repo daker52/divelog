@@ -1811,6 +1811,19 @@ body.theme-dark .export-menu button:hover {
 .auth-submit:hover { background: rgba(14, 120, 190, 0.95); }
 .auth-submit:disabled { opacity: 0.6; cursor: wait; }
 
+.auth-link {
+  width: 100%;
+  background: none;
+  border: none;
+  color: rgba(160, 204, 232, 0.85);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 4px 0 0;
+  text-decoration: underline;
+}
+.auth-link:hover { color: #fff; }
+
 .auth-error {
   color: #ff8a8a;
   font-size: 0.83rem;
@@ -1820,4 +1833,20 @@ body.theme-dark .export-menu button:hover {
   padding: 0.5rem 0.6rem;
 }
 
+.auth-success {
+  color: #7de8a0;
+  font-size: 0.83rem;
+  text-align: center;
+  background: rgba(50, 200, 100, 0.12);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+
+.auth-info-panel {
+  text-align: center;
+  padding: 8px 0;
+}
+.auth-info-panel .auth-info-icon { font-size: 2.5rem; margin-bottom: 8px; }
+.auth-info-panel h3 { color: #a0cce8; margin: 0 0 8px; font-size: 1.1rem; }
+.auth-info-panel p { color: rgba(200,220,240,0.8); font-size: 0.88rem; margin: 0 0 16px; }
 

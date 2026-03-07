@@ -42,6 +42,7 @@
             <button class="auth-tab active" data-tab="login" type="button">Přihlásit se</button>
             <button class="auth-tab" data-tab="register" type="button">Registrovat</button>
           </div>
+          <!-- Login Form -->
           <form id="loginForm" class="auth-form" novalidate>
             <label>E-mail
               <input type="email" name="email" autocomplete="email" required placeholder="vas@email.cz" />
@@ -51,7 +52,10 @@
             </label>
             <p class="auth-error hidden" id="loginError"></p>
             <button type="submit" class="auth-submit">Přihlásit se</button>
+            <button type="button" class="auth-link" id="forgotPasswordBtn">Zapomenuté heslo?</button>
           </form>
+
+          <!-- Register Form -->
           <form id="registerForm" class="auth-form hidden" novalidate>
             <label>Uživatelské jméno
               <input type="text" name="username" autocomplete="username" required placeholder="Váš nickname" />
@@ -64,6 +68,40 @@
             </label>
             <p class="auth-error hidden" id="registerError"></p>
             <button type="submit" class="auth-submit">Registrovat</button>
+          </form>
+
+          <!-- Register Success Panel -->
+          <div id="registerSuccessPanel" class="auth-info-panel hidden">
+            <div class="auth-info-icon">📧</div>
+            <h3>Zkontroluj svůj e-mail!</h3>
+            <p>Odeslali jsme ti ověřovací odkaz. Klikni na něj pro aktivaci účtu, pak se přihlaš.</p>
+            <button type="button" class="auth-submit" id="backToLoginBtn">Zpět na přihlášení</button>
+          </div>
+
+          <!-- Forgot Password Form -->
+          <form id="forgotForm" class="auth-form hidden" novalidate>
+            <p style="color:#a0cce8;margin:0 0 12px">Zadej svůj e-mail a pošleme ti odkaz pro obnovu hesla.</p>
+            <label>E-mail
+              <input type="email" name="email" autocomplete="email" required placeholder="vas@email.cz" />
+            </label>
+            <p class="auth-error hidden" id="forgotError"></p>
+            <p class="auth-success hidden" id="forgotSuccess"></p>
+            <button type="submit" class="auth-submit">Odeslat odkaz</button>
+            <button type="button" class="auth-link" id="backToLoginFromForgotBtn">Zpět na přihlášení</button>
+          </form>
+
+          <!-- Reset Password Form -->
+          <form id="resetForm" class="auth-form hidden" novalidate>
+            <p style="color:#a0cce8;margin:0 0 12px">Zadej nové heslo pro svůj účet.</p>
+            <label>Nové heslo <small>(min. 6 znaků)</small>
+              <input type="password" name="password" autocomplete="new-password" required placeholder="••••••••" />
+            </label>
+            <label>Nové heslo znovu
+              <input type="password" name="password2" autocomplete="new-password" required placeholder="••••••••" />
+            </label>
+            <p class="auth-error hidden" id="resetError"></p>
+            <p class="auth-success hidden" id="resetSuccess"></p>
+            <button type="submit" class="auth-submit">Nastavit heslo</button>
           </form>
         </div>
       </section>

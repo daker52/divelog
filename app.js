@@ -2021,17 +2021,31 @@ function bindAuthEvents() {
   const tabs = document.querySelectorAll(".auth-tab");
   const loginForm = document.getElementById("loginForm");
   const registerForm = document.getElementById("registerForm");
+  const forgotForm = document.getElementById("forgotForm");
+  const resetForm = document.getElementById("resetForm");
+  const registerSuccessPanel = document.getElementById("registerSuccessPanel");
 
+  // Helper: show only one auth panel at a time
+  function showAuthPanel(panel) {
+    [loginForm, registerForm, forgotForm, resetForm, registerSuccessPanel].forEach(el => el?.classList.add("hidden"));
+    tabs.forEach(t => t.classList.add("hidden")); // hide tabs when showing special panels
+    panel?.classList.remove("hidden");
+  }
+  function showMainAuth(tab = "login") {
+    [forgotForm, resetForm, registerSuccessPanel].forEach(el => el?.classList.add("hidden"));
+    tabs.forEach(t => { t.classList.remove("hidden"); t.classList.toggle("active", t.dataset.tab === tab); });
+    loginForm?.classList.toggle("hidden", tab !== "login");
+    registerForm?.classList.toggle("hidden", tab !== "register");
+  }
+
+  // Tab switching
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("active"));
-      tab.classList.add("active");
-      const isLogin = tab.dataset.tab === "login";
-      loginForm?.classList.toggle("hidden", !isLogin);
-      registerForm?.classList.toggle("hidden", isLogin);
+      showMainAuth(tab.dataset.tab);
     });
   });
 
+  // Login form
   loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = loginForm.querySelector(".auth-submit");
@@ -2062,6 +2076,7 @@ function bindAuthEvents() {
     }
   });
 
+  // Register form
   registerForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = registerForm.querySelector(".auth-submit");
@@ -2080,10 +2095,75 @@ function bindAuthEvents() {
         errEl.classList.remove("hidden");
         return;
       }
-      setToken(data.token);
-      setCurrentUserData(data.user);
-      await loadDataFromAPI();
-      finishLogin();
+      // Registration OK → show verify email panel
+      showAuthPanel(registerSuccessPanel);
+    } catch {
+      errEl.textContent = "Chyba připojení k serveru.";
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Back to login from success panel
+  document.getElementById("backToLoginBtn")?.addEventListener("click", () => showMainAuth("login"));
+
+  // Forgot password link
+  document.getElementById("forgotPasswordBtn")?.addEventListener("click", () => showAuthPanel(forgotForm));
+  document.getElementById("backToLoginFromForgotBtn")?.addEventListener("click", () => showMainAuth("login"));
+
+  // Forgot password form submit
+  forgotForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = forgotForm.querySelector(".auth-submit");
+    const errEl = document.getElementById("forgotError");
+    const okEl = document.getElementById("forgotSuccess");
+    btn.disabled = true;
+    errEl.classList.add("hidden");
+    okEl.classList.add("hidden");
+    const fd = new FormData(forgotForm);
+    try {
+      await apiFetch("/auth/forgot-password", { method: "POST", body: { email: fd.get("email") } });
+      okEl.textContent = "Pokud u nás máš účet, přišel ti e-mail s odkazem pro obnovu hesla.";
+      okEl.classList.remove("hidden");
+      forgotForm.reset();
+    } catch {
+      errEl.textContent = "Chyba připojení k serveru.";
+      errEl.classList.remove("hidden");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Reset password form submit
+  resetForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = resetForm.querySelector(".auth-submit");
+    const errEl = document.getElementById("resetError");
+    const okEl = document.getElementById("resetSuccess");
+    btn.disabled = true;
+    errEl.classList.add("hidden");
+    okEl.classList.add("hidden");
+    const fd = new FormData(resetForm);
+    if (fd.get("password") !== fd.get("password2")) {
+      errEl.textContent = "Hesla se neshodují.";
+      errEl.classList.remove("hidden");
+      btn.disabled = false;
+      return;
+    }
+    const resetToken = resetForm.dataset.resetToken;
+    try {
+      const res = await apiFetch("/auth/reset-password", { method: "POST", body: { token: resetToken, password: fd.get("password") } });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || "Chyba.";
+        errEl.classList.remove("hidden");
+        return;
+      }
+      okEl.textContent = "Heslo bylo změněno. Přihlas se.";
+      okEl.classList.remove("hidden");
+      resetForm.reset();
+      setTimeout(() => showMainAuth("login"), 2500);
     } catch {
       errEl.textContent = "Chyba připojení k serveru.";
       errEl.classList.remove("hidden");
@@ -2385,6 +2465,49 @@ async function init() {
     }
     // token invalid/expired
     clearToken();
+  }
+
+  // Handle email verification link (?verify=TOKEN)
+  const urlParams = new URLSearchParams(window.location.search);
+  const verifyToken = urlParams.get("verify");
+  const resetToken = urlParams.get("reset");
+
+  if (verifyToken) {
+    window.setTimeout(async () => {
+      setPhase("auth");
+      try {
+        const res = await apiFetch(`/auth/verify/${verifyToken}`);
+        const data = await res.json();
+        const loginErr = document.getElementById("loginError");
+        if (loginErr) {
+          loginErr.textContent = res.ok
+            ? "✅ E-mail ověřen! Nyní se přihlas."
+            : (data.error || "Neplatný ověřovací odkaz.");
+          loginErr.style.color = res.ok ? "#7de8a0" : "#ff8a8a";
+          loginErr.style.background = res.ok ? "rgba(50,200,100,0.12)" : "rgba(255,80,80,0.12)";
+          loginErr.classList.remove("hidden");
+        }
+      } catch {/* ignore */}
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }, 2200);
+    return;
+  }
+
+  if (resetToken) {
+    window.setTimeout(() => {
+      setPhase("auth");
+      const resetForm = document.getElementById("resetForm");
+      if (resetForm) {
+        resetForm.dataset.resetToken = resetToken;
+        // Show only reset form
+        ["loginForm","registerForm","forgotForm","registerSuccessPanel"].forEach(id => document.getElementById(id)?.classList.add("hidden"));
+        document.querySelectorAll(".auth-tab").forEach(t => t.classList.add("hidden"));
+        resetForm.classList.remove("hidden");
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }, 2200);
+    return;
   }
 
   window.setTimeout(() => {
