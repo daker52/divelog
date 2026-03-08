@@ -52,7 +52,7 @@ const appState = {
     equipment: "all",
     startDate: "",
     endDate: "",
-    types: new Set(["Recreational", "Freediving"]),
+    types: new Set(),
   },
 };
 
@@ -1003,10 +1003,12 @@ function createDiveFromForm() {
 }
 
 function createChips(values) {
+  if (!Array.isArray(values)) return "";
   return values.map((value) => `<span class="chip">${value}</span>`).join("");
 }
 
 function createEquipmentChips(equipment) {
+  if (!Array.isArray(equipment)) return "";
   const gearNames = new Set(appState.gear.map(g => g.name));
   return equipment.map(name => {
     const known = gearNames.has(name);
@@ -1247,7 +1249,8 @@ function getFilteredDives() {
     const matchesLocation = location === "all" || dive.location === location;
     const matchesEquipment = equipment === "all" || dive.equipment.includes(equipment);
     const matchesDate = passesDateFilter(dive.date, startDate, endDate);
-    const matchesType = types.size === 0 || types.has(dive.type);
+    const diveTypeLower = (dive.type || "").toLowerCase();
+    const matchesType = types.size === 0 || [...types].some(t => t.toLowerCase() === diveTypeLower);
 
     return matchesQuery && matchesLocation && matchesEquipment && matchesDate && matchesType;
   });
@@ -1499,8 +1502,8 @@ function renderDiveDetail(dive) {
   });
   dom.wildlifeChips.innerHTML = createChips(dive.wildlife);
 
-  dom.notesInput.value = Array.isArray(dive.notes) ? dive.notes.join("\n") : "";
-  renderPhotos(dive.photos);
+  dom.notesInput.value = Array.isArray(dive.notes) ? dive.notes.join("\n") : (dive.notes || "");
+  renderPhotos(Array.isArray(dive.photos) ? dive.photos : []);
   renderDiveProfile(dive);
   renderDetailMap(dive);
 }
@@ -1531,10 +1534,10 @@ function renderStatistics(filteredDives) {
   const [topLocation, topLocationCount] = Object.entries(locationCounts).sort((a, b) => b[1] - a[1])[0];
 
   const airMixCount = filteredDives.filter((dive) =>
-    dive.gasMix.some((mix) => mix.toLowerCase().includes("air"))
+    Array.isArray(dive.gasMix) && dive.gasMix.some((mix) => mix.toLowerCase().includes("air"))
   ).length;
   const eanxCount = filteredDives.filter((dive) =>
-    dive.gasMix.some((mix) => mix.toLowerCase().includes("eanx"))
+    Array.isArray(dive.gasMix) && dive.gasMix.some((mix) => mix.toLowerCase().includes("eanx"))
   ).length;
 
   dom.statsTotalDives.textContent = String(filteredDives.length);
