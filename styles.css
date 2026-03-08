@@ -299,10 +299,13 @@ select {
 
 .main-wrap {
   padding: 12px 16px 16px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tab-pane {
   height: 100%;
+  min-height: 0;
 }
 
 .forum-layout {
